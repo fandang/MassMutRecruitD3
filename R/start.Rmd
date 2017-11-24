@@ -1,0 +1,126 @@
+---
+output:
+  html_document:
+    toc_float: true
+    theme: readable
+---
+<center>
+<br/><img src="../_resources/img/logo.jpg" />
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+library(RSQLite)
+library(ggplot2)
+library(sqldf)
+library(knitr)
+
+fmtPoint <- function(x) {
+  x <- gsub("_", " ", x)
+  x <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(x, 1,1)), substring(x, 2), sep="", collapse=" ")
+}
+
+drv <- dbDriver("SQLite")
+connection = dbConnect(drv=drv, dbname="../recruit.db")
+
+query <- "SELECT customer.id, race_code, race.value as race_text, education_id, education.value as education_text, home_owner, state, is_smoker, is_exerciser, has_insurance, income, travel_spending, sports_leisure_spending, economic_stability, insurance_segment_id, insurance_segment.value as insurance_segment_text, youtube_user_rank, facebook_user_rank, gender FROM customer, race, education, insurance_segment where customer.race_code = race.code and customer.education_id = education.id and customer.insurance_segment_id = insurance_segment.id"
+df_customer = dbGetQuery(connection, query)
+
+#kable(head(df_customer))
+
+plot_for <- function(title, x_val){
+  ggplot(df_customer, aes(x=x_val, fill=x_val)) + geom_bar(fill = "#26386a") + ggtitle(title) + xlab(title) + ylab("Customer Count") + scale_fill_discrete(name = title) + theme(plot.background = element_rect(size=1,linetype="solid",color="gray")) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+hist_for <- function(title, data, x_val){
+  ggplot(data, aes(x_val, fill=I("#26386a"))) + geom_histogram() + theme(plot.background = element_rect(size=1,linetype="solid",color="gray")) +xlab(title)
+}
+
+
+```
+
+### View Insurance Sales By: {.tabset}
+
+#### Race
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Race", df_customer$race_text);
+```
+
+#### Education
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Education", df_customer$education_text);
+```
+
+#### Home Ownership
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Home Ownership", df_customer$home_owner);
+```
+
+#### State
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("State", df_customer$state) + coord_flip();
+```
+
+#### Smoker Status
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Smoker Status", df_customer$is_smoker);
+```
+
+#### Exerciser
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Exerciser", df_customer$is_exerciser);
+```
+
+#### Has Insurance
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Has Insurance", df_customer$has_insurance);
+
+```
+
+#### Income
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+income_subset <- df_customer[df_customer$income < 500,]
+hist_for("Income", income_subset, income_subset$income)
+
+```
+
+#### Travel Spending
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+travel_spending_subset <- df_customer[df_customer$travel_spending < 750,]
+hist_for("Travel Spending", travel_spending_subset,
+ travel_spending_subset$travel_spending)
+
+```
+
+#### Sports Leisure Spending
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+sports_spending_subset <- df_customer[df_customer$sports_leisure_spending < 2500,]
+hist_for("Sports Leisure Spending", sports_spending_subset, sports_spending_subset$sports_leisure_spending)
+
+```
+
+#### Economic Stability
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Economic Stability", df_customer$economic_stability);
+```
+
+#### Insurance Segment
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Insurance Segment", df_customer$insurance_segment_text);
+```
+
+#### YouTube User Rank
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("YouTube User Rank", df_customer$youtube_user_rank);
+```
+
+#### Facebook User Rank
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Facebook User Rank", df_customer$facebook_user_rank);
+```
+
+#### Gender
+```{r echo=FALSE, message=FALSE, warning=FALSE, show=FALSE}
+plot_for("Gender", df_customer$gender);
+```
+
+</center>

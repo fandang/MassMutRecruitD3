@@ -1,0 +1,107 @@
+---
+title: "Mass Mutual Data Visualization"
+author: "Dan Fanelli"
+date: "May 19, 2017"
+output: html_document
+---
+
+## MM Explore
+
+```{r echo=FALSE, message=FALSE}
+library(RSQLite)
+library(sqldf)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(corrplot)
+
+con <- dbConnect(SQLite(), dbname="../recruit.db")
+customers <- dbGetQuery(con, "SELECT customer.id, race_code, race.value as race_text, education_id, education.value as education_text, home_owner, state, is_smoker, is_exerciser, has_insurance, income, travel_spending, sports_leisure_spending, economic_stability, insurance_segment_id, insurance_segment.value as insurance_segment_text, youtube_user_rank, facebook_user_rank, gender FROM customer, race, education, insurance_segment where customer.race_code = race.code and customer.education_id = education.id and customer.insurance_segment_id = insurance_segment.id")
+  
+colnames(customers)
+total_num_rows <- nrow(customers)
+
+for(col_nm in colnames(customers)){
+  na_cnt <- sum(is.na(customers[,c(col_nm)]))
+  cat(sprintf("%s of %s NA's in col: %s \n", na_cnt, total_num_rows, col_nm));
+}
+
+kable(head(customers, n=10))
+
+summary(customers)
+
+bar_plot <- function(coldata, the_title){
+  ggplot(data.frame(coldata), aes(coldata)) + geom_bar() + theme(axis.text.x = element_text(angle = 70, hjust = 1)) + labs(title = the_title) + xlab(the_title)
+}
+
+p1 <- bar_plot(customers$race_text,"race_text")
+p2 <- bar_plot(customers$education_text,"education_text")
+p3 <- bar_plot(customers$home_owner,"home_owner")
+p4 <- bar_plot(customers$state,"state") + coord_flip()
+p5 <- bar_plot(customers$is_smoker,"is_smoker")
+p6 <- bar_plot(customers$is_exerciser,"is_exerciser")
+p7 <- bar_plot(customers$has_insurance,"has_insurance (ALL ENTRIES IN DB ARE BLANK)")
+
+num_hist_bins <- 20
+
+# Remove the top X percent (outliers)
+p8 <- ggplot(subset(customers, income < quantile(customers$income, 0.995, na.rm = TRUE)), aes(income)) + geom_histogram(bins=num_hist_bins) + labs(title = "income")
+
+p9 <- ggplot(subset(customers, travel_spending < quantile(customers$travel_spending, 0.98, na.rm = TRUE)), aes(travel_spending)) + geom_histogram(bins=num_hist_bins) + labs(title = "travel_spending")
+
+p10 <- ggplot(subset(customers, sports_leisure_spending < quantile(customers$sports_leisure_spending, 0.98, na.rm = TRUE)), aes(sports_leisure_spending)) + geom_histogram(bins=num_hist_bins) + labs(title = "sports_leisure_spending")
+
+p11 <- bar_plot(customers$economic_stability,"economic_stability")
+p12 <- bar_plot(customers$insurance_segment_text,"insurance_segment_text")
+p13 <- bar_plot(customers$youtube_user_rank,"youtube_user_rank")
+p14 <- bar_plot(customers$facebook_user_rank,"facebook_user_rank")
+p15 <- bar_plot(customers$gender,"gender")
+
+grid.arrange(p1, p2, ncol=2)
+grid.arrange(p3, p4, ncol=2)
+grid.arrange(p5, p6, ncol=2)
+grid.arrange(p7, p8, ncol=2)
+grid.arrange(p9, p10, ncol=2)
+grid.arrange(p11, p12, ncol=2)
+grid.arrange(p13, p14, ncol=2)
+grid.arrange(p15, p15, ncol=2)
+
+```
+
+# Analyze SPORTS LEISURE (Where all the NAs are)
+
+```{r echo=FALSE, message=FALSE}
+numeric_cols <- c("income","travel_spending","sports_leisure_spending","economic_stability","youtube_user_rank","facebook_user_rank")
+
+sports_leisure_spending_NA <- data.matrix(customers[is.na(customers$sports_leisure_spending),][,numeric_cols])
+
+sports_leisure_spending_NOT_NA <- data.matrix(customers[!is.na(customers$sports_leisure_spending),][,numeric_cols])
+
+# check for ZERO INFLATIONS:
+sports_leisure_spending_NA_to_0 <- sports_leisure_spending_NA
+sports_leisure_spending_NA_to_0[,c("sports_leisure_spending")] <- 0
+```
+
+# Corr Plot when SPORTS LEISURE NOT NA
+
+```{r echo=FALSE, message=FALSE}
+corrplot(cor(sports_leisure_spending_NOT_NA), method="circle")
+```
+
+# Corr Plot when SPORTS LEISURE IS NA
+
+```{r echo=FALSE, message=FALSE}
+corrplot(cor(sports_leisure_spending_NA), method="circle")
+```
+
+# Corr Plot when SPORTS LEISURE NAs are TURNED TO ZEROs
+
+```{r echo=FALSE, message=FALSE}
+corrplot(cor(sports_leisure_spending_NA_to_0), method="circle")
+```
+
+```{r echo=FALSE, message=FALSE}
+dbDisconnect(con)
+```
+

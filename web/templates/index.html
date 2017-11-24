@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+	<meta http-equiv="Pragma" content="no-cache" />
+	<meta http-equiv="Expires" content="0" />
+	<title>Recruitment Application</title>
+	<style>
+		.axis {
+		  font: 10px sans-serif;
+		}
+
+		.axis path,
+		.axis line {
+		  fill: none;
+		  stroke: #000;
+		  shape-rendering: crispEdges;
+		}
+	</style>
+	<style>
+		rect.bar { fill: steelblue; }
+	</style>
+	<style>
+		body {
+			margin: auto;
+			width: 700px;
+			padding: 10px;
+		}
+		a {
+			text-decoration: none;
+			display: inline-block;
+			padding: 4px 12px;
+		}
+
+		a:hover {
+			background-color: #ddd;
+			color: black;
+		}
+
+		.previous {
+			background-color: #f1f1f1;
+			color: black;
+		}
+
+		.next {
+			background-color: #f1f1f1;
+			color: black;
+		}
+
+		.round {
+			border-radius: 50%;
+		}
+
+	</style>
+
+</head>
+<body>
+
+	<center>
+
+	<img src="../static/logo.jpg" style="width:600px" />
+    <h3>View Insurance Sales By:
+
+		<a href="#" class="previous round">&#8249;</a>
+
+		<select id="countSummarySelect">
+			<option value="race.value">Race</option>
+			<option value="education.value">Education</option>
+			<option value="home_owner">Home Ownership</option>
+			<option value="state">US State</option>
+			<option value="is_smoker">Smoker Status</option>
+			<option value="is_exerciser">Exerciser</option>
+			<option value="has_insurance">Has Insurance</option>
+			<option value="income">Income</option>
+			<option value="travel_spending">Travel Spending</option>
+			<option value="sports_leisure_spending">Sports Leisure Spending</option>
+			<option value="economic_stability">Economic Stability</option>
+			<option value="insurance_segment.value">Insurance Segment</option>
+			<option value="youtube_user_rank">YouTube User Ranks</option>
+			<option value="facebook_user_rank">Facebook User Ranks</option>
+			<option value="gender">Gender</option>
+		</select>
+
+		<a href="#" class="next round">&#8250;</a>
+
+	</h3>
+
+    <h2 id="title"></h2>
+    <div id="result_chart">
+		<svg id="mainSVG" width="960" height="500"></svg>
+    </div>
+    <div id="result_data" style="border:1px solid gray; width:300px; margin-top:100px; visibility:hidden; position:absolute;">
+        <ul></ul>
+    </div>
+
+
+    <script src="//d3js.org/d3.v3.min.js"></script>
+    <!-- orig: http://bl.ocks.org/d3noob/8952219 -->
+    <script>
+
+		d3.select("#countSummarySelect").on("change", function(){
+			var val = this.value
+			var txt = this.options[this.selectedIndex].innerHTML
+			document.getElementById("title").innerHTML = txt;
+			doCountQueryAndBarChart(val);
+		});
+
+		function printResult(result){
+			console.log("RESULT = " + JSON.stringify(result));
+    	}
+
+		function doCountQueryAndBarChart(column){
+        	var generic_query = "select " + column + " as the_label, count(*) as the_count from customer, race, education, insurance_segment where customer.race_code = race.code and customer.education_id = education.id and customer.insurance_segment_id = insurance_segment.id group by the_label";
+			if(column == "income" || column == "travel_spending" || column == "sports_leisure_spending"){
+				var extraSQL = " ";
+				var blockSize = 1;
+				if(column == "income"){
+					extraSQL = " where income > 500 ";
+					blockSize = 100;
+				} else if(column == "travel_spending"){
+					extraSQL = " where travel_spending > 750 ";
+					blockSize = 1000;
+				} else if(column == "sports_leisure_spending"){
+					extraSQL = " where sports_leisure_spending > 2500 ";
+					blockSize = 500;
+				}
+	        	generic_query = "select ''||(cast((" + column + "/(1.0*"+blockSize+")) as int))*"+blockSize+" as the_label, count(*) as the_count from customer " + extraSQL + " group by 1 order by 1";
+			}
+
+			console.log("----------------------------------------");
+			console.log("QUERY: " + generic_query);
+			console.log("----------------------------------------");
+
+			d3.select("svg").selectAll("*").remove();
+
+			var margin = {top: 20, right: 20, bottom: 70, left: 20},
+				width = 800 - margin.left - margin.right,
+				height = 400 - margin.top - margin.bottom;
+
+			var x = d3.scale.ordinal().rangeRoundBands([0, width], .05);
+
+			var y = d3.scale.linear().range([height, 0]);
+
+			var xAxis = d3.svg.axis()
+				.scale(x)
+				.orient("bottom")
+
+			var yAxis = d3.svg.axis()
+				.scale(y)
+				.orient("left")
+				.ticks(10);
+
+			var svg = d3.select("svg")
+				.attr("width", width + margin.left + margin.right)
+				.attr("height", height + margin.top + margin.bottom)
+			  	.append("g")
+				.attr("transform","translate(" + margin.left + "," + margin.top + ")")
+
+			d3.json("/api/query?q="+generic_query, function(json){
+				printResult(json.data);
+				d3.select("#result_data ul").selectAll("li").remove()
+					.data(json.data).enter()
+					.append("li").text(function(d) {
+						printResult(d);
+						return d.the_label + ": " + d.the_count;
+					});
+
+				x.domain(json.data.map(function(d) { return d.the_label; }));
+				y.domain([0, d3.max(json.data, function(d) { return d.the_count; })]);
+
+				svg.append("g")
+				  .attr("class", "x axis")
+				  .attr("transform", "translate(0," + height + ")")
+				  .call(xAxis)
+				.selectAll("text")
+				  .style("text-anchor", "end")
+				  .attr("dx", "-.8em")
+				  .attr("dy", "-.55em")
+				  .attr("transform", "rotate(-45)" );
+
+				svg.append("g")
+				  .attr("class", "y axis")
+				  .call(yAxis)
+				  .append("text")
+				  .attr("transform", "rotate(-90)")
+				  .attr("y", 6)
+				  .attr("dy", ".71em")
+				  .style("text-anchor", "end")
+				  .text("Count")
+
+
+				svg.selectAll("bar")
+				  .data(json.data)
+				.enter().append("rect")
+				  .style("fill", "#26386a")
+				  .attr("x", function(d) { return x(d.the_label); })
+				  .attr("width", x.rangeBand())
+				  .attr("y", function(d) { return y(d.the_count); })
+				  .attr("height", function(d) { return height - y(d.the_count); })
+
+			});
+		}
+
+		// initialize to the first one:
+		doCountQueryAndBarChart("race.value");
+		document.getElementById("title").innerHTML = "Race";
+
+		function setTitleBasedOnSelectBox(){
+			var selectedValue = document.getElementById("countSummarySelect").value;
+			doCountQueryAndBarChart(selectedValue);
+			var txt = document.getElementById("countSummarySelect").options[document.getElementById("countSummarySelect").selectedIndex].innerHTML
+			document.getElementById("title").innerHTML = txt;
+		}
+
+		d3.select(".previous").on('click', function(d) {
+			var selIndex = document.getElementById("countSummarySelect").selectedIndex;
+			if(selIndex > 0){
+				document.getElementById("countSummarySelect").selectedIndex = (-1) + document.getElementById("countSummarySelect").selectedIndex;
+				setTitleBasedOnSelectBox();
+			}
+		});
+
+		d3.select(".next").on('click', function(d) {
+			var numSelectOptions = document.getElementById("countSummarySelect").length;
+			var selIndex = document.getElementById("countSummarySelect").selectedIndex;
+			if(selIndex < (numSelectOptions-1)){
+				document.getElementById("countSummarySelect").selectedIndex = (1) + document.getElementById("countSummarySelect").selectedIndex;
+				setTitleBasedOnSelectBox();
+			}
+		});
+
+    </script>
+
+	</center>
+
+</body>
+</html>
